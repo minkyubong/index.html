@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baccarat Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            gap: 5px;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: green;
+        }
+        .button-container {
+            margin: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            margin: 5px;
+        }
+        #result, #mainResult, #subResult {
+            margin: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            min-height: 30px;
+            color: black;
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Baccarat - Tool</h1>
+<div id="board"></div>
+<div>누적 데이터 <최소 18개></div>
+<div id="scoreboard">
+    P: <span id="playerCount">0</span> 
+    B: <span id="bankerCount">0</span> 
+    T: <span id="tieCount">0</span>
+</div>
+<div id="mainResult">메인 결과: 없음</div>
+<div id="subResult">보조 결과: 없음</div>
+<div id="result">예측 결과</div>
+
+<div class="button-container">
+    <button id="playerButton">P</button>
+    <button id="bankerButton">B</button>
+    <button id="tieButton">T</button>
+    <button id="clearButton">◀</button>
+</div>
+
+<script>
+    const board = document.getElementById('board');
+    const playerCountDisplay = document.getElementById('playerCount');
+    const bankerCountDisplay = document.getElementById('bankerCount');
+    const tieCountDisplay = document.getElementById('tieCount');
+    const resultDisplay = document.getElementById('result');
+    const mainResultDisplay = document.getElementById('mainResult');
+    const subResultDisplay = document.getElementById('subResult');
+
+    let currentIndex = 0; // 현재 인덱스
+    const maxCells = 90; // 최대 셀 수
+    const results = []; // 결과 배열
+
+    // 보드 셀 생성
+    for (let i = 0; i < maxCells; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.index = i; // 인덱스 저장
+        board.appendChild(cell);
+    }
+
+    // 버튼 클릭 이벤트 핸들러
+    function updateCell(value) {
+        if (currentIndex < maxCells) {
+            const columnIndex = Math.floor(currentIndex / 6); // 열 인덱스 계산
+            const rowIndex = currentIndex % 6; // 행 인덱스 계산
+            const cell = document.querySelector(`.cell[data-index='${rowIndex * 15 + columnIndex}']`);
+            cell.textContent = value;
+            results.push(value);
+            playerCountDisplay.textContent = results.filter(r => r === 'P').length; // P 카운트 업데이트
+            bankerCountDisplay.textContent = results.filter(r => r === 'B').length; // B 카운트 업데이트
+            tieCountDisplay.textContent = results.filter(r => r === 'T').length; // T 카운트 업데이트
+            currentIndex++;
+
+            // 최소 18개 입력 후 예측 요청
+            if (results.length >= 18) {
+                fetchPrediction();
+            }
+        }
+    }
+
+    document.getElementById('playerButton').addEventListener('click', function() {
+        updateCell('P');
+    });
+
+    document.getElementById('bankerButton').addEventListener('click', function() {
+        updateCell('B');
+    });
+
+    document.getElementById('tieButton').addEventListener('click', function() {
+        updateCell('T');
+    });
+
+    // 지우기 버튼
+    document.getElementById('clearButton').addEventListener('click', function() {
+        if (currentIndex > 0) {
+            currentIndex--;
+            const columnIndex = Math.floor(currentIndex / 6);
+            const rowIndex = currentIndex % 6;
+            const cell = document.querySelector(`.cell[data-index='${rowIndex * 15 + columnIndex}']`);
+            cell.textContent = ''; // 해당 셀 비우기
+            results.pop(); // 결과 배열에서 마지막 요소 제거
+            playerCountDisplay.textContent = results.filter(r => r === 'P').length; // P 카운트 업데이트
+            bankerCountDisplay.textContent = results.filter(r => r === 'B').length; // B 카운트 업데이트
+            tieCountDisplay.textContent = results.filter(r => r === 'T').length; // T 카운트 업데이트
+        }
+    });
+
+    // 예측 요청 함수
+    async function fetchPrediction() {
+        const response = await fetch('http://127.0.0.1:5000/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                input: `현재 게임 결과는 ${results.join(', ')}입니다. 과거 패턴과 현재 패턴의 6배열 패턴 기법 확률 높은 패턴분석기법으로 분석하여 메인 결과는 P[플레이어] 또는 B[뱅커]로 알려주고, 보조 결과는 T[타이]의 확률이 20% 이상일 때만 알려주세요. P와 B의 결과를 괄호 안에(확률%) 형식으로 알려주세요. 예시: "P [플레이어] (확률 70%)입니다!" 패턴 데이터값 학습 완료! 최대한 답변을 응원메시지와 함께 진짜 짧고 간결하게 위 예시 " "안에 있는 예시대로만 부탁드립니다! 진짜 간결하게!`
+            })
+        });
+
+        const data = await response.json();
+        console.log(data); // 응답을 콘솔에 출력하여 디버깅
+        if (data.response) {
+            resultDisplay.textContent = data.response; // 예측 결과 표시
+            
+            // 메인 결과 및 보조 결과 처리
+            const mainResultMatch = data.response.match(/([PB])\s*\[.*?\]\s*\(확률\s*\d+%\)/g);
+            const subResultMatch = data.response.match(/(T\s*\[.*?\])\s*\(확률\s*\d+%\)/);
+
+            if (mainResultMatch && mainResultMatch.length > 0) {
+                mainResultDisplay.textContent = "메인 결과: " + mainResultMatch.join(', ');
+
+                // 배경색 설정
+                if (mainResultMatch[0].startsWith('P')) {
+                    mainResultDisplay.style.backgroundColor = 'blue';
+                    mainResultDisplay.style.color = 'white';
+                } else {
+                    mainResultDisplay.style.backgroundColor = 'red';
+                    mainResultDisplay.style.color = 'white';
+                }
+            } else {
+                mainResultDisplay.textContent = "메인 결과: 없음";
+                mainResultDisplay.style.backgroundColor = 'white'; // 기본 배경색으로 복원
+            }
+
+            // T [타이]의 결과가 20% 이상일 경우에만 보조 결과 출력
+            if (subResultMatch) {
+                subResultDisplay.textContent = "보조 결과: " + subResultMatch[0] + " 살짝!!"; // 보조 결과에 소액 추천 추가
+                subResultDisplay.style.backgroundColor = 'green'; // 밝은 초록색 배경
+                subResultDisplay.style.color = 'white'; // 글씨 색상을 흰색으로
+                subResultDisplay.style.fontWeight = 'bold'; // 볼드체 설정
+            } else {
+                subResultDisplay.textContent = "보조 결과: 없음";
+                subResultDisplay.style.backgroundColor = 'white'; // 기본 배경색으로 복원
+            }
+        } else {
+            resultDisplay.textContent = "예측 결과를 가져오는 데 오류가 발생했습니다.";
+        }
+    }
+</script>
+
+</body>
+</html>
